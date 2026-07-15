@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Timer, Plane } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Timer, Plane, ChevronDown, ChevronUp } from "lucide-react";
 import { useUi } from "@/context/UiContext";
 import { useNavigate } from "react-router-dom";
 
@@ -206,6 +206,7 @@ const deals = [
     color: "#1D4ED8",
   }
 ];
+
 function useCountdown() {
   const [t, setT] = useState({ h: 12, m: 34, s: 56 });
   useEffect(() => {
@@ -227,9 +228,13 @@ export function Deals() {
   const countdown = useCountdown();
   const { t } = useUi();
   const navigate = useNavigate();
+  
+  // State to manage how many cards are visible
+  const [visibleCount, setVisibleCount] = useState(6);
+  const isExpanded = visibleCount >= deals.length;
 
   const handleBookNow = (deal: typeof deals[number]) => {
-    navigate("/paymentform", {
+    navigate("/booking", {
       state: {
         airline: deal.airline,
         airlineCode: deal.code,
@@ -243,11 +248,21 @@ export function Deals() {
     });
   };
 
+  const toggleShowMore = () => {
+    if (isExpanded) {
+      setVisibleCount(6); // Collapse back to 6
+    } else {
+      setVisibleCount(deals.length); // Show everything
+    }
+  };
+
   return (
-    <section className="relative py-24">
+    <section className="relative py-20 sm:py-24">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-secondary/60 to-transparent" />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-6 mb-12">
+        
+        {/* Header section */}
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between mb-10 sm:mb-12">
           <div className="max-w-lg">
             <span className="inline-block px-3 py-1 rounded-full bg-warning/15 text-warning text-xs font-bold uppercase tracking-widest">
               {t('deals.eyebrow')}
@@ -256,7 +271,7 @@ export function Deals() {
               {t('deals.title')}
             </h2>
           </div>
-          <div className="glass rounded-2xl px-5 py-3 flex items-center gap-3">
+          <div className="glass rounded-2xl px-5 py-3 flex flex-wrap items-center gap-3 w-full sm:w-auto justify-center sm:justify-start">
             <Timer className="h-4 w-4 text-warning" />
             <span className="text-xs font-semibold text-foreground/70">{t('deals.endsIn')}</span>
             <div className="flex gap-1 font-mono text-sm font-bold">
@@ -267,59 +282,87 @@ export function Deals() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {deals.map((d, i) => (
-            <motion.div
-              key={d.airline}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              className="relative overflow-hidden rounded-3xl bg-card border border-border p-6 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-elegant)] hover:-translate-y-1 transition-all"
-            >
-              <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full opacity-20 blur-2xl" style={{ background: d.color }} />
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl font-bold text-white" style={{ background: d.color }}>
-                    {d.code}
+        {/* Deals Grid - Sliced to visibleCount */}
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <AnimatePresence mode="popLayout">
+            {deals.slice(0, visibleCount).map((d, i) => (
+              <motion.div
+                key={d.airline}
+                layout // Smooth transition layout swap when expanding/collapsing
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i < 6 ? i * 0.05 : 0 }}
+                className="relative overflow-hidden rounded-3xl bg-card border border-border p-5 sm:p-6 shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-elegant)] hover:-translate-y-1 transition-all"
+              >
+                <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full opacity-20 blur-2xl" style={{ background: d.color }} />
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-12 w-12 place-items-center rounded-2xl font-bold text-white" style={{ background: d.color }}>
+                      {d.code}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{d.airline}</p>
+                      <p className="text-xs text-muted-foreground">Direct · Business</p>
+                    </div>
                   </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-destructive text-white">
+                    -{d.off}%
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 text-sm mb-6">
                   <div>
-                    <p className="font-semibold text-sm">{d.airline}</p>
-                    <p className="text-xs text-muted-foreground">Direct · Business</p>
+                    <p className="text-xs text-muted-foreground">{t('deals.from')}</p>
+                    <p className="font-bold">{d.from}</p>
+                  </div>
+                  <div className="flex-1 relative">
+                    <div className="border-t-2 border-dashed border-border" />
+                    <Plane className="absolute -top-2 left-1/2 -translate-x-1/2 h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">{t('deals.to')}</p>
+                    <p className="font-bold">{d.to}</p>
                   </div>
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-destructive text-white">
-                  -{d.off}%
-                </span>
-              </div>
 
-              <div className="flex items-center gap-3 text-sm mb-6">
-                <div>
-                  <p className="text-xs text-muted-foreground">{t('deals.from')}</p>
-                  <p className="font-bold">{d.from}</p>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground line-through">${d.old}</p>
+                    <p className="text-3xl font-extrabold gradient-text">${d.price}</p>
+                  </div>
+                  <button onClick={() => handleBookNow(d)} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity">
+                    {t('deals.bookNow')}
+                  </button>
                 </div>
-                <div className="flex-1 relative">
-                  <div className="border-t-2 border-dashed border-border" />
-                  <Plane className="absolute -top-2 left-1/2 -translate-x-1/2 h-4 w-4 text-primary" />
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">{t('deals.to')}</p>
-                  <p className="font-bold">{d.to}</p>
-                </div>
-              </div>
-
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground line-through">${d.old}</p>
-                  <p className="text-3xl font-extrabold gradient-text">${d.price}</p>
-                </div>
-                <button onClick={() => handleBookNow(d)} className="px-5 py-2.5 rounded-full text-sm font-semibold bg-foreground text-background hover:opacity-90 transition-opacity">
-                  {t('deals.bookNow')}
-                </button>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
+
+        {/* Action Button Section */}
+        {deals.length > 6 && (
+          <div className="mt-12 flex justify-center">
+            <button
+              onClick={toggleShowMore}
+              className="group flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold bg-card border border-border text-foreground hover:bg-secondary/40 transition-all duration-300 shadow-[var(--shadow-soft)] hover:shadow-md w-full sm:w-auto justify-center"
+            >
+              {isExpanded ? (
+                <>
+                  Show Less
+                  <ChevronUp className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
+                </>
+              ) : (
+                <>
+                  Show More ({deals.length - 6} more)
+                  <ChevronDown className="h-4 w-4 group-hover:translate-y-0.5 transition-transform" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
       </div>
     </section>
   );

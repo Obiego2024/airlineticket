@@ -1,6 +1,9 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+// Import html2canvas and jspdf for device-level downloading
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import {
   Plane,
   ArrowRight,
@@ -19,13 +22,13 @@ import {
   Wifi,
   Building,
   Car,
-  Download,
-  Mail,
-  Home,
-  QrCode,
   DollarSign,
-  AlertCircle,
-  Coins
+  Building2,
+  Clock,
+  ShieldAlert,
+  Printer,
+  Briefcase,
+  Download
 } from 'lucide-react'
 import { flights, generateSeats, extras } from '../lib/data'
 import type { Seat } from '../lib/data'
@@ -78,14 +81,30 @@ const extraIcons: Record<string, React.ReactNode> = {
   car: <Car className="w-5 h-5" />,
 }
 
+type DealBookingState = {
+  airline: string
+  airlineCode: string
+  from: string
+  to: string
+  price: number
+  oldPrice: number
+  discount: number
+  cabin?: string
+}
+
 export default function Booking({ promoRegistered = false }: { promoRegistered?: boolean }) {
   const { flightId } = useParams()
+  const location = useLocation()
   const [currentStep, setCurrentStep] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [seats, setSeats] = useState<Seat[]>(generateSeats())
   const [selectedExtras, setSelectedExtras] = useState<number[]>([])
 
-  // Passenger unified controlled state layout (includes Email & Phone updates)
+  // State to track if the payment has been confirmed/approved by an admin
+  const [paymentApproved, setPaymentApproved] = useState(false)
+  const [showPendingScreen, setShowPendingScreen] = useState(false)
+
+  // Passenger state
   const [passengerDetails, setPassengerDetails] = useState({
     firstName: '',
     lastName: '',
@@ -95,21 +114,46 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
     phone: ''
   })
 
-  // Complete multi-payment validation parameters mapping
+  // Payment state
   const [paymentData, setPaymentData] = useState({
-    method: 'card',
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardholderName: '',
+    method: 'direct',
     paypalEmail: '',
-    flexPayPlan: '3_months',
+    transferReference: '',
     agreedToTerms: false,
-    cryptoCurrency: 'USDT',
-    walletConnected: false
   })
 
-  const flight = flights.find((f) => f.id === Number(flightId)) || flights[0]
+  const dealRouteState = (location.state as DealBookingState | null) ?? null
+  const flight = (
+    dealRouteState
+      ? {
+          id: 0,
+          airline: dealRouteState.airline,
+          flightNumber: `${dealRouteState.airlineCode}-DEAL`,
+          departure: {
+            airport: dealRouteState.from,
+            code: dealRouteState.airlineCode,
+            time: 'Flexible',
+            city: dealRouteState.from,
+          },
+          arrival: {
+            airport: dealRouteState.to,
+            code: dealRouteState.airlineCode,
+            time: 'Flexible',
+            city: dealRouteState.to,
+          },
+          duration: 'Flexible',
+          stops: 0,
+          aircraft: 'Premium cabin',
+          terminal: 'TBD',
+          price: dealRouteState.price,
+          cabin: dealRouteState.cabin || 'Business',
+          baggage: 'Included',
+          refundable: true,
+          seatsAvailable: 6,
+          rating: 5,
+        }
+      : flights.find((f) => f.id === Number(flightId)) || flights[0]
+  ) as (typeof flights)[number]
   const selectedSeatIds = seats.filter((s) => s.type === 'selected').map((s) => s.id)
   const seatPrice = seats.filter((s) => s.type === 'selected').reduce((sum, s) => sum + (s.price || 0), 0)
   const extrasPrice = selectedExtras.reduce((sum, id) => {
@@ -141,11 +185,19 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
     )
   }
 
-  // Mandatory Verification Interceptor Gate before letting state trigger Complete Confirmation
   const handleComplete = () => {
-    if (paymentData.method === 'card') {
-      if (!paymentData.cardNumber || !paymentData.expiryDate || !paymentData.cvv || !paymentData.cardholderName) {
-        alert('Payment Declined: Complete all valid Credit Card parameter entries to continue.')
+    if (paymentData.method === 'direct') {
+      if (!paymentData.transferReference) {
+        alert('Validation Error: Please enter your transaction transfer reference number.')
+        return
+      }
+      if (!paymentData.agreedToTerms) {
+        alert('Validation Error: You must agree to the Terms and Conditions before proceeding.')
+        return
+      }
+
+      if (!paymentApproved) {
+        setShowPendingScreen(true)
         return
       }
     } else if (paymentData.method === 'paypal') {
@@ -153,17 +205,12 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
         alert('Payment Declined: Enter a valid verified PayPal routing account configuration email.')
         return
       }
-    } else if (paymentData.method === 'flexpay') {
-      if (!paymentData.agreedToTerms) {
-        alert('Payment Declined: Affirm and authorize the Installment Loan Disclosures framework.')
-        return
-      }
-    } else if (paymentData.method === 'crypto') {
-      if (!paymentData.walletConnected) {
-        alert('Payment Declined: Web3 provider connection or invoice signature simulation required.')
+      if (!paymentApproved) {
+        setShowPendingScreen(true)
         return
       }
     }
+
     setCompleted(true)
   }
 
@@ -176,23 +223,68 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
         promoDiscount={promoDiscount}
         passenger={passengerDetails} 
         selectedSeats={selectedSeatIds} 
+        hasBaggageExtra={selectedExtras.includes(1)} // dynamic checked bag mapping
       />
+    )
+  }
+
+  if (showPendingScreen && !paymentApproved) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-20 pb-12 flex items-center justify-center px-4">
+        <div className="max-w-xl w-full bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 text-center shadow-xl space-y-6">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto animate-pulse">
+            <Clock className="w-8 h-8" />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Awaiting Administrator Approval</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
+              We received your payment details with transfer reference <span className="font-mono font-bold text-slate-700 dark:text-slate-200">"{paymentData.transferReference || 'N/A'}"</span>. 
+              Your seats are temporarily reserved. E-tickets will be delivered immediately following manual backend ledger confirmation.
+            </p>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/20 rounded-2xl p-4 text-left">
+            <div className="flex gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-400">Simulation Portal Note</h4>
+                <p className="text-xs text-amber-700 dark:text-amber-500/90 mt-1">
+                  In production, this updates dynamically via a webhook/websocket once an admin approves the ticket in the dashboard.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-3 uppercase tracking-widest font-semibold">Mock Admin Dashboard Trigger</p>
+            <button
+              onClick={() => {
+                setPaymentApproved(true);
+                setCompleted(true);
+              }}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-600/15 text-sm"
+            >
+              [Admin] Approve Payment & Confirm Booking
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-20 pb-12">
-      {/* Progress Bar Container */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-0">
             {steps.map((step, i) => {
               const Icon = step.icon
               const isActive = i === currentStep
               const isCompleted = i < currentStep
 
               return (
-                <div key={step.id} className="flex items-center flex-1 last:flex-none">
+                <div key={step.id} className="flex items-center flex-1 min-w-[72px] last:flex-none">
                   <div className="flex flex-col items-center">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
@@ -249,13 +341,12 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
               )}
             </AnimatePresence>
 
-            {/* Step Controls Module */}
-            <div className="flex items-center justify-between mt-8">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between mt-8">
               <button
                 type="button"
                 onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
                 disabled={currentStep === 0}
-                className="flex items-center gap-2 px-6 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 font-medium disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 font-medium disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back
@@ -265,7 +356,7 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
                 <button
                   type="button"
                   onClick={() => setCurrentStep((s) => s + 1)}
-                  className="flex items-center gap-2 px-8 py-3 bg-sky-500 text-white rounded-xl font-semibold hover:bg-sky-600 transition-colors"
+                  className="flex items-center justify-center gap-2 px-8 py-3 bg-sky-500 text-white rounded-xl font-semibold hover:bg-sky-600 transition-colors"
                 >
                   Continue
                   <ArrowRight className="w-4 h-4" />
@@ -274,16 +365,15 @@ export default function Booking({ promoRegistered = false }: { promoRegistered?:
                 <button
                   type="button"
                   onClick={handleComplete}
-                  className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10"
+                  className="flex items-center justify-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10"
                 >
                   <BadgeCheck className="w-5 h-5" />
-                  Complete Booking
+                  Submit for Approval
                 </button>
               )}
             </div>
           </div>
 
-          {/* Checkout Invoice SidePanel */}
           <aside className="w-full lg:w-80 flex-shrink-0">
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sticky top-24">
               <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white mb-4">
@@ -354,7 +444,6 @@ function PassengerForm({ passengerDetails, setPassengerDetails }: PassengerFormP
     >
       <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Passenger Details</h2>
 
-      {/* Identity Configuration */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center gap-2 mb-5">
           <div className="w-8 h-8 rounded-full bg-sky-500 text-white flex items-center justify-center text-sm font-bold">1</div>
@@ -413,7 +502,6 @@ function PassengerForm({ passengerDetails, setPassengerDetails }: PassengerFormP
         </div>
       </div>
 
-      {/* Mandatory Notification Delivery Routing Form */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
         <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Contact Routing Details</h3>
         <p className="text-xs text-slate-500 mb-4">Destination indexing endpoints for high-density E-Ticket transmission vouchers.</p>
@@ -547,27 +635,16 @@ interface PaymentFormProps {
   setPaymentData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-function PaymentForm({ totalPrice, paymentData, setPaymentData }: PaymentFormProps) {
+function PaymentForm({ paymentData, setPaymentData }: PaymentFormProps) {
   const paymentMethods = [
-    { id: 'card', label: 'Credit Card' },
-    { id: 'paypal', label: 'PayPal Gateway' },
-    { id: 'flexpay', label: 'Flex Pay' },
-    { id: 'crypto', label: 'Crypto (Optional)' },
+    { id: 'direct', label: 'Direct Bank Transfer' },
+    { id: 'paypal', label: 'PayPal' },
   ]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     setPaymentData((prev: any) => ({ ...prev, [name]: val }))
-  }
-
-  const toggleWalletConnection = () => {
-    setPaymentData((prev: any) => ({ ...prev, walletConnected: !prev.walletConnected }))
-  }
-
-  const calculateInstallment = (plan: string) => {
-    const splitCount = plan === '3_months' ? 3 : 6;
-    return ((totalPrice * 1.04) / splitCount).toFixed(2);
   }
 
   return (
@@ -579,8 +656,7 @@ function PaymentForm({ totalPrice, paymentData, setPaymentData }: PaymentFormPro
     >
       <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">Secure Settlement Engine</h2>
 
-      {/* Selector Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {paymentMethods.map((pm) => (
           <button
             key={pm.id}
@@ -597,54 +673,65 @@ function PaymentForm({ totalPrice, paymentData, setPaymentData }: PaymentFormPro
         ))}
       </div>
 
-      {/* Credit Card View */}
-      {paymentData.method === 'card' && (
+      {/* Direct Bank Transfer View */}
+      {paymentData.method === 'direct' && (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Cardholder Name</label>
-            <input
-              type="text"
-              name="cardholderName"
-              value={paymentData.cardholderName}
-              onChange={handleChange}
-              placeholder="John Doe"
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-sky-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Card Number</label>
-            <input
-              type="text"
-              name="cardNumber"
-              value={paymentData.cardNumber}
-              onChange={handleChange}
-              placeholder="4111 2222 3333 4444"
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-sky-500"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-700">
+            <div className="w-10 h-10 rounded-full bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-sky-500" />
+            </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Expiration</label>
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Direct Bank Transfer Instructions</h4>
+              <p className="text-xs text-slate-500">Transfer total amount manually to standard ledger accounts.</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-700/30 rounded-xl p-4 space-y-3 font-mono text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Bank Name</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">Global Horizon Bank</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Account Number</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">9876 5432 1098 7654</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Account Holder</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">Horizon Aviation Group</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Required Reference</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">HZ-FLY-TX</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                Your Transfer Transaction Reference / ID
+              </label>
               <input
                 type="text"
-                name="expiryDate"
-                value={paymentData.expiryDate}
+                name="transferReference"
+                value={paymentData.transferReference}
                 onChange={handleChange}
-                placeholder="MM/YY"
+                placeholder="Paste transfer receipt Reference ID here..."
                 className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-sky-500"
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">CVV Security Code</label>
+
+            <label className="flex items-start gap-2.5 cursor-pointer pt-1">
               <input
-                type="text"
-                name="cvv"
-                value={paymentData.cvv}
+                type="checkbox"
+                name="agreedToTerms"
+                checked={paymentData.agreedToTerms}
                 onChange={handleChange}
-                placeholder="321"
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-sky-500"
+                className="mt-1 rounded border-slate-300 text-sky-500 focus:ring-sky-500"
               />
-            </div>
+              <span className="text-xs text-slate-500 dark:text-slate-400 leading-normal">
+                I understand that my seats and ticket reservation are held as <strong>Pending</strong> and will not be officially booked until an administrator manually verifies and confirms receipt of funds.
+              </span>
+            </label>
           </div>
         </div>
       )}
@@ -652,7 +739,9 @@ function PaymentForm({ totalPrice, paymentData, setPaymentData }: PaymentFormPro
       {/* PayPal View */}
       {paymentData.method === 'paypal' && (
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4 text-center">
-          <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto"><DollarSign className="w-6 h-6" /></div>
+          <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto">
+            <DollarSign className="w-6 h-6" />
+          </div>
           <div>
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white">PayPal Access Node Connection</h4>
             <p className="text-xs text-slate-500 mt-1">Specify your registered portal address token context below.</p>
@@ -667,62 +756,6 @@ function PaymentForm({ totalPrice, paymentData, setPaymentData }: PaymentFormPro
           />
         </div>
       )}
-
-      {/* Flex Pay View */}
-      {paymentData.method === 'flexpay' && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-sky-600"><AlertCircle className="w-5 h-5" /><h4 className="text-sm font-semibold uppercase">Installment Financing Engine</h4></div>
-          <select
-            name="flexPayPlan"
-            value={paymentData.flexPayPlan}
-            onChange={handleChange}
-            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-sky-500"
-          >
-            <option value="3_months">3 Installment cycles (+4% Processing)</option>
-            <option value="6_months">6 Installment cycles (+4% Processing)</option>
-          </select>
-          <div className="bg-slate-50 dark:bg-slate-700/30 p-4 rounded-xl grid grid-cols-2 gap-4 text-sm font-mono">
-            <div><p className="text-xs text-slate-400">Recurrent Installment</p><p className="font-bold">${calculateInstallment(paymentData.flexPayPlan)} / mo</p></div>
-            <div><p className="text-xs text-slate-400">Immediate Initiation Fee</p><p className="font-bold text-emerald-600">${calculateInstallment(paymentData.flexPayPlan)}</p></div>
-          </div>
-          <label className="flex items-start gap-2 cursor-pointer pt-1">
-            <input type="checkbox" name="agreedToTerms" checked={paymentData.agreedToTerms} onChange={handleChange} className="mt-0.5 rounded border-slate-300" />
-            <span className="text-xs text-slate-400">Authorize recurrent installment program pulling cycles matching the schedule framework.</span>
-          </label>
-        </div>
-      )}
-
-      {/* Optional Crypto Node Viewport */}
-      {paymentData.method === 'crypto' && (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto"><Coins className="w-6 h-6" /></div>
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Optional Web3 Payment Protocol</h4>
-            <p className="text-xs text-slate-500 mt-1">Settle invoices directly over decentralized ledgers via wallet execution bindings.</p>
-          </div>
-          <div className="flex justify-center gap-2 max-w-xs mx-auto">
-            {['USDT', 'ETH', 'BTC'].map((token) => (
-              <button
-                key={token}
-                type="button"
-                onClick={() => setPaymentData((prev: any) => ({ ...prev, cryptoCurrency: token }))}
-                className={`flex-1 py-1.5 border text-xs font-mono font-bold rounded-lg ${paymentData.cryptoCurrency === token ? 'border-amber-500 bg-amber-500/10 text-amber-600' : 'border-slate-200 text-slate-500'}`}
-              >
-                {token}
-              </button>
-            ))}
-          </div>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={toggleWalletConnection}
-              className={`px-6 py-2 rounded-xl text-xs font-mono font-bold transition-all ${paymentData.walletConnected ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
-            >
-              {paymentData.walletConnected ? '✓ Web3 Provider Linked' : 'Link Web3 Browser Wallet'}
-            </button>
-          </div>
-        </div>
-      )}
     </motion.div>
   )
 }
@@ -734,105 +767,312 @@ interface BookingConfirmationProps {
   promoDiscount: number;
   passenger: any;
   selectedSeats: string[];
+  hasBaggageExtra: boolean;
 }
 
-function BookingConfirmation({ flight, totalPrice, promoRegistered, promoDiscount, passenger, selectedSeats }: BookingConfirmationProps) {
-  const pnrReference = 'PNR' + Math.floor(Math.random() * 900000 + 100000);
-  const ticketNumber = '016 ' + Math.floor(Math.random() * 9000000000 + 1000000000);
+function BookingConfirmation({ flight, passenger, selectedSeats, hasBaggageExtra }: BookingConfirmationProps) {
+  const passRef = useRef<HTMLDivElement>(null)
+
+  // Standard Print trigger
+  const handlePrint = () => {
+    window.print()
+  }
+
+  // Passenger dynamic formulation
+  const passengerLastName = (passenger.lastName || 'Passenger').toUpperCase()
+  const passengerFirstName = (passenger.firstName || 'Guest').toUpperCase()
+  const formattedName = `${passengerLastName} / ${passengerFirstName} MR`
+
+  // Dynamic Routing setup
+  const flightNo = flight.flightNumber || 'SV1801'
+  const departureCode = flight.departure?.code || 'RUH'
+  const departureAirport = flight.departure?.airport || 'Riyadh King Khalid Intl'
+  const arrivalCode = flight.arrival?.code || 'GIZ'
+  const arrivalAirport = flight.arrival?.airport || 'Gizan'
+
+  const departureTime = flight.departure?.time || '23:40'
+  const arrivalTime = flight.arrival?.time || '01:30'
+
+  // Dynamic Airline Name linking directly to the chosen Flight layout
+  const airlineName = flight.airline || 'SAUDIA'
+
+  // Generate dynamic dates based on the year 2026
+  const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' } as const
+  const today = new Date('2026-07-15T15:00:00')
+  const departureDateString = today.toLocaleDateString('en-GB', dateOptions)
+  
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  const arrivalDateString = tomorrow.toLocaleDateString('en-GB', dateOptions)
+
+  const assignedSeat = selectedSeats[0] || '39A'
+
+  // Unique dynamic details
+  const randomTicketNumber = `065${Math.floor(1000000000 + Math.random() * 9000000000)}`
+  const randomBookingRef = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+  // Dynamic PDF download using html2canvas & jsPDF
+  const handleDownloadPDF = async () => {
+    const element = passRef.current
+    if (!element) return
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2.5, // Crisp retina-quality canvas scaling
+        useCORS: true,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+      pdf.save(`BoardingPass_${passengerLastName}_${flightNo}.pdf`)
+    } catch (error) {
+      console.error('PDF generation error:', error)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 pt-24 pb-16 flex items-center justify-center px-4">
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl w-full space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pt-20 pb-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 print:p-0">
         
-        {/* Header Confirmation Details */}
-        <div className="text-center space-y-1">
-          <div className="w-12 h-12 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-sm"><Check className="w-6 h-6" /></div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Electronic Ticket Manifest</h1>
-          <p className="text-xs text-slate-400">High-fidelity receipt output payload transmitted successfully.</p>
+        {/* Confirmation banner */}
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center space-y-6 shadow-xl print:hidden">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
+            <BadgeCheck className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Payment Approved & Ticket Issued!</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">
+              Your flight is locked. Download a copy directly to your device or print to keep standard offline travel documents handy.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-emerald-600/10"
+            >
+              <Download className="w-4 h-4" />
+              Download PDF Ticket
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-6 py-3 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-sky-500/10"
+            >
+              <Printer className="w-4 h-4" />
+              Print Ticket Layout
+            </button>
+            <Link to="/" className="inline-block px-6 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold rounded-xl text-sm transition-colors hover:bg-slate-50">
+              Return Home
+            </Link>
+          </div>
         </div>
 
-        {/* Dynamic Boarding Stub Visual Display */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-          <div className="bg-slate-900 dark:bg-slate-800 text-white p-6 flex flex-col sm:flex-row justify-between gap-4 font-mono">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider">{flight.airline || 'SkyLink Airways'}</h2>
-              <p className="text-[10px] text-slate-400">PASSENGER CHECK-IN RECORD DEPLOYMENT</p>
+        {/* CSS override for system print */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .printable-boarding-pass, .printable-boarding-pass * {
+              visibility: visible;
+            }
+            .printable-boarding-pass {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              color: #000 !important;
+              background: #fff !important;
+            }
+          }
+        ` }} />
+
+        {/* Boarding Pass Component Wrapper */}
+        <div 
+          ref={passRef}
+          className="printable-boarding-pass max-w-3xl mx-auto bg-white border border-slate-300 rounded-lg p-8 space-y-6 shadow-md text-slate-900 select-none font-sans"
+        >
+          {/* Top Row: Logo & Fake Barcode */}
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                {/* Dynamically loads the chosen airline name directly here */}
+                <span className="font-serif tracking-widest text-2xl font-extrabold text-[#B59A57] uppercase">{airlineName}</span>
+                <span className="text-xs bg-[#B59A57] text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wider scale-90">SKYTEAM</span>
+              </div>
+              <p className="text-2xl font-extrabold tracking-tight text-slate-800">Boarding Pass</p>
+              <h1 className="text-3xl font-extrabold text-slate-900 tracking-wide mt-1">{formattedName}</h1>
             </div>
-            <div className="sm:text-right">
-              <p className="text-xs text-slate-400">RECORD LOCATOR (PNR)</p>
-              <p className="text-lg font-bold text-sky-400 tracking-widest">{pnrReference}</p>
+
+            <div className="flex flex-col items-end">
+              <div className="w-48 h-8 bg-slate-900 flex items-center justify-between px-1 opacity-90 overflow-hidden relative">
+                {Array.from({ length: 48 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    style={{ width: `${(i % 3 === 0 ? 3 : i % 2 === 0 ? 1 : 2)}px` }} 
+                    className="h-full bg-white" 
+                  />
+                ))}
+              </div>
+              <span className="text-[9px] text-slate-400 font-mono tracking-widest mt-1">SEQ: {Math.floor(Math.random() * 90) + 10}</span>
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 p-4 rounded-xl gap-4 font-mono">
+          {/* FLIGHT INFORMATION */}
+          <div className="space-y-3">
+            <div className="bg-[#B59A57] text-white text-[11px] font-bold px-4 py-1 uppercase tracking-wider rounded-sm">
+              Flight Information
+            </div>
+            
+            <div className="grid grid-cols-5 gap-2 text-center py-2">
               <div>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{flight.departure?.code || 'SFO'}</p>
-                <p className="text-[11px] text-slate-400 truncate">{flight.departure?.date}</p>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Flight</p>
+                <p className="text-xl font-black text-slate-900">{flightNo}</p>
               </div>
-              <div className="text-center text-xs text-slate-400 flex-1 px-4">
-                <p>{flight.duration}</p>
-                <div className="h-0.5 w-full bg-slate-200 dark:bg-slate-700 my-1 relative" />
-                <p className="text-[10px]">{flight.stops === 0 ? 'NON-STOP' : 'TRANSIT FLIGHT'}</p>
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Seat</p>
+                <p className="text-xl font-black text-slate-900">{assignedSeat}</p>
               </div>
-              <div className="sm:text-right">
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{flight.arrival?.code || 'JFK'}</p>
-                <p className="text-[11px] text-slate-400 font-mono">{flight.arrival?.time}</p>
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Zone</p>
+                <p className="text-xl font-black text-slate-900">3</p>
               </div>
-            </div>
-
-            {/* Matrix Data Spec Block */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 font-mono text-xs border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div><span className="block text-slate-400 text-[10px] uppercase">Passenger Legal Name</span><strong className="text-slate-800 dark:text-slate-200">{passenger.lastName ? `${passenger.lastName.toUpperCase()}, ${passenger.firstName}` : 'DOE, JOHN'}</strong></div>
-              <div><span className="block text-slate-400 text-[10px] uppercase">Assigned Cabin Index</span><strong className="text-sky-500">{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'GATE'}</strong></div>
-              <div><span className="block text-slate-400 text-[10px] uppercase">Passport Identification</span><strong className="text-slate-800 dark:text-slate-200">{passenger.passportNumber || 'N/A'}</strong></div>
-              <div><span className="block text-slate-400 text-[10px] uppercase">Contact Vector (Email)</span><strong className="text-slate-800 dark:text-slate-200 truncate block">{passenger.email || 'N/A'}</strong></div>
-              <div><span className="block text-slate-400 text-[10px] uppercase">Mobile Number Mapping</span><strong className="text-slate-800 dark:text-slate-200">{passenger.phone || 'N/A'}</strong></div>
-              <div><span className="block text-slate-400 text-[10px] uppercase">Operational Document ID</span><strong className="text-slate-800 dark:text-slate-200">{ticketNumber}</strong></div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-center pt-2 gap-4">
-              <div className="text-xs text-slate-400 space-y-0.5 max-w-sm font-mono">
-                <p className="font-bold text-amber-600 uppercase flex items-center gap-1"><Shield className="w-3.5 h-3.5" /> Gate Security Mandate</p>
-                <p className="text-[11px]">Gate operations close exactly 20 minutes before departure execution cycles. Ground handling mandates valid documentation mapping parameters.</p>
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Boarding Time</p>
+                <p className="text-xl font-black text-slate-900">{departureTime}</p>
               </div>
-              <div className="p-2 border rounded-xl bg-white flex items-center justify-center flex-shrink-0">
-                <QrCode className="w-16 h-16 text-slate-900" strokeWidth={1.5} />
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase">Gate</p>
+                <p className="text-xl font-black text-slate-900">Check Monitors</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 px-6 py-4 flex flex-col gap-2 text-xs font-mono">
-            <span className="text-slate-400 font-medium">Settled Manifest Amount: <strong className="text-slate-900 dark:text-white font-bold">${totalPrice}</strong></span>
-            {promoRegistered && (
-              <span className="text-emerald-600 font-medium">Promo discount applied: -${promoDiscount}</span>
-            )}
-            <span className="text-emerald-600 font-bold uppercase flex items-center gap-1"><Check className="w-4 h-4" /> Cleared Block</span>
+          {/* Route details */}
+          <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-100 py-4">
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">From ({departureCode})</span>
+              <p className="font-extrabold text-slate-900 text-lg">{departureAirport}</p>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Plane className="w-3.5 h-3.5 rotate-90 text-[#B59A57]" />
+                <span>Terminal 5</span>
+              </div>
+              <p className="text-xs font-bold text-slate-800 mt-1">{departureDateString} {departureTime}</p>
+            </div>
+
+            <div className="space-y-1 pl-4 border-l border-slate-100">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">To ({arrivalCode})</span>
+              <p className="font-extrabold text-slate-900 text-lg">{arrivalAirport}</p>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Plane className="w-3.5 h-3.5 rotate-180 text-[#B59A57]" />
+                <span>Arrival Gate Terminal</span>
+              </div>
+              <p className="text-xs font-bold text-slate-800 mt-1">{arrivalDateString} {arrivalTime}</p>
+            </div>
+          </div>
+
+          {/* TRAVEL INFORMATION */}
+          <div className="space-y-3">
+            <div className="bg-[#B59A57] text-white text-[11px] font-bold px-4 py-1 uppercase tracking-wider rounded-sm">
+              Travel Information
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 text-xs">
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <User className="w-5 h-5 text-slate-400 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-slate-800">Boarding pass information</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Validate physical passport credentials prior to gate approach.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Shield className="w-5 h-5 text-slate-400 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-slate-800">Travel documents</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Passport Number {passenger.passportNumber || 'N/A'} must match physical visa records.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Briefcase className="w-5 h-5 text-slate-400 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-slate-800">Checked baggage allowance</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {hasBaggageExtra ? '1 Checked bag up to 23 kg allowed.' : 'Checked bag extra not purchased. Carry-on limits apply.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Luggage className="w-5 h-5 text-slate-400 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-slate-800">Carry-on baggage allowance</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">One piece not to exceed 07 kg and standard 115cm dimensions.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 pl-4 border-l border-slate-100">
+                <div>
+                  <h4 className="text-[10px] uppercase font-bold text-slate-400">Class of Travel</h4>
+                  <p className="font-bold text-slate-800">Guest Discounted</p>
+                </div>
+                <div>
+                  <h4 className="text-[10px] uppercase font-bold text-slate-400">Booking Reference</h4>
+                  <p className="font-extrabold text-[#B59A57] tracking-wider">{randomBookingRef}</p>
+                </div>
+                <div>
+                  <h4 className="text-[10px] uppercase font-bold text-slate-400">Ticket No (ETKT)</h4>
+                  <p className="font-semibold text-slate-800">{randomTicketNumber}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* NEXT STEPS */}
+          <div className="space-y-3">
+            <div className="bg-[#B59A57] text-white text-[11px] font-bold px-4 py-1 uppercase tracking-wider rounded-sm">
+              Next Steps
+            </div>
+
+            <div className="grid grid-cols-3 gap-6 text-[10px] text-slate-600 leading-relaxed">
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-800">Note</h4>
+                <p>Please reserve enough time for baggage check-in, security controls, and boarding procedures.</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-800">Carry-on baggage only</h4>
+                <p>Proceed straight to airport security controls if you have no checked bags.</p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-800">Departure</h4>
+                <p>Have a wonderful trip! Regularly check digital departure status monitors for adjustments.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Barcode */}
+          <div className="border-t border-slate-150 pt-4 flex flex-col items-center gap-1">
+            <div className="w-64 h-8 bg-slate-900 flex items-center justify-between px-1 opacity-80 overflow-hidden">
+              {Array.from({ length: 64 }).map((_, i) => (
+                <div 
+                  key={i} 
+                  style={{ width: `${(i % 5 === 0 ? 3 : i % 2 === 0 ? 1 : 2)}px` }} 
+                  className="h-full bg-white" 
+                />
+              ))}
+            </div>
+            <span className="text-[9px] text-slate-400 font-mono tracking-widest">*{randomTicketNumber}*</span>
           </div>
         </div>
 
-        {/* Document Action Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <button 
-            type="button" 
-            onClick={() => alert(`PDF Generated successfully: ${pnrReference}`)}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-sky-500 text-white rounded-xl font-semibold hover:bg-sky-600 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download PDF Receipt
-          </button>
-          <button 
-            type="button"
-            onClick={() => alert(`Email transmitted payload successfully to target destination context: ${passenger.email}`)}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50"
-          >
-            <Mail className="w-4 h-4" /> Push copy to Email
-          </button>
-          <Link to="/" className="sm:w-32 flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-slate-800 text-white rounded-xl font-semibold hover:bg-slate-800">
-            <Home className="w-4 h-4" /> Home
-          </Link>
-        </div>
-
-      </motion.div>
+      </div>
     </div>
   )
 }

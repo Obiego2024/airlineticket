@@ -172,7 +172,7 @@ export default function FlightDetails() {
               <ChevronRight className="w-5 h-5" />
             </Link>
           </div>
-        </motion.div>
+        </motion.div>a
       </div>
     </div>
   )

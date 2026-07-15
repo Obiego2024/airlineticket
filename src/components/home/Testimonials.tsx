@@ -129,11 +129,11 @@ export function Testimonials() {
   }, [activeIndex]);
 
   return (
-    <section className="relative overflow-hidden bg-slate-950 py-28 text-white sm:px-6 lg:px-8">
+    <section className="relative overflow-hidden bg-slate-100/70 py-28 text-slate-800 transition-colors duration-300 dark:bg-slate-950 dark:text-white sm:px-6 lg:px-8">
       {/* Background Ambience styling */}
-      <div className="absolute top-1/2 right-[-10%] -z-10 h-[500px] w-[500px] rounded-full bg-amber-500/5 blur-[140px]" />
-      <div className="absolute bottom-[-10%] left-[-10%] -z-10 h-[500px] w-[500px] rounded-full bg-indigo-500/5 blur-[140px]" />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_80%,transparent_100%)]" />
+      <div className="absolute top-1/2 right-[-10%] -z-10 h-[500px] w-[500px] rounded-full bg-slate-900/[0.01] blur-[140px] dark:bg-amber-500/5" />
+      <div className="absolute bottom-[-10%] left-[-10%] -z-10 h-[500px] w-[500px] rounded-full bg-indigo-500/[0.02] blur-[140px] dark:bg-indigo-500/5" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#00000002_1px,transparent_1px),linear-gradient(to_bottom,#00000002_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_80%,transparent_100%)] dark:bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)]" />
 
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeader 
@@ -174,17 +174,21 @@ export function Testimonials() {
                   animate={{
                     scale: isSelected ? 1 : 0.95,
                     opacity: isSelected ? 1 : 0.35,
-                    borderColor: isSelected ? "rgba(245, 158, 11, 0.4)" : "rgba(255, 255, 255, 0.05)",
-                    boxShadow: isSelected ? "0 0 50px rgba(245, 158, 11, 0.06)" : "none"
+                    borderColor: isSelected 
+                      ? "rgba(245, 158, 11, 0.4)" 
+                      : "rgba(0, 0, 0, 0.08)",
+                    boxShadow: isSelected 
+                      ? "0 10px 40px rgba(0, 0, 0, 0.04)" 
+                      : "none"
                   }}
                   transition={{ duration: 0.4 }}
                   style={{ width: `${CARD_WIDTH}px`, flexShrink: 0 }}
-                  className="relative flex flex-col justify-between overflow-hidden rounded-3xl border bg-slate-900/40 p-8 backdrop-blur-xl"
+                  className="relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white/75 p-8 backdrop-blur-xl dark:border-white/5 dark:bg-slate-900/40"
                 >
                   <div>
                     {/* Top Verification Header */}
-                    <div className="mb-5 flex items-center justify-between border-b border-white/5 pb-4">
-                      <div className="flex items-center gap-1 text-[10px] font-mono tracking-wider text-amber-500 uppercase">
+                    <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-white/5">
+                      <div className="flex items-center gap-1 text-[10px] font-mono tracking-wider text-amber-600 uppercase dark:text-amber-500">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         <span>{r.verification}</span>
                       </div>
@@ -196,32 +200,32 @@ export function Testimonials() {
                     </div>
 
                     {/* Content Text */}
-                    <p className="text-sm font-normal leading-relaxed text-slate-300">
+                    <p className="text-sm font-normal leading-relaxed text-slate-600 dark:text-slate-300">
                       "{r.text}"
                     </p>
                   </div>
 
                   {/* Verified Metadata Footer */}
-                  <div className="mt-8 border-t border-white/5 pt-5">
-                    <div className="mb-3 font-mono text-[10px] text-slate-500 flex items-center gap-1.5">
+                  <div className="mt-8 border-t border-slate-100 pt-5 dark:border-white/5">
+                    <div className="mb-3 font-mono text-[10px] text-slate-400 flex items-center gap-1.5 dark:text-slate-500">
                       <Building2 className="h-3 w-3" />
                       <span>Verified Manifest: {r.route}</span>
                     </div>
                     
                     <footer className="flex items-center gap-3">
                       {/* Premium Initials/Avatar Image Frame */}
-                      <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 p-[1px] shadow-inner border border-white/10 group-hover:border-amber-500/30">
-                        <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-gradient-to-tr from-amber-500/10 to-amber-500/20 font-mono text-xs font-bold tracking-tight text-amber-400">
+                      <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-[1px] shadow-inner border border-slate-200 group-hover:border-amber-500/30 dark:from-slate-900 dark:to-slate-950 dark:border-white/10">
+                        <div className="flex h-full w-full items-center justify-center rounded-[10px] bg-gradient-to-tr from-amber-500/10 to-amber-500/20 font-mono text-xs font-bold tracking-tight text-amber-600 dark:text-amber-400">
                           {initials}
                         </div>
                       </div>
                       
                       <div>
-                        <p className="text-sm font-semibold tracking-tight text-slate-200">
+                        <p className="text-sm font-semibold tracking-tight text-slate-800 dark:text-slate-200">
                           {r.name}
                         </p>
-                        <p className="text-xs text-slate-400">
-                          {r.role}, <span className="text-slate-500">{r.company}</span>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {r.role}, <span className="text-slate-400 dark:text-slate-500">{r.company}</span>
                         </p>
                       </div>
                     </footer>
@@ -233,16 +237,16 @@ export function Testimonials() {
         </div>
 
         {/* Lower Utility Control Bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-6 sm:flex-row max-w-5xl mx-auto border-t border-white/5 pt-8">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 sm:flex-row max-w-5xl mx-auto border-t border-slate-200 pt-8 dark:border-white/5">
           
           {/* Tracking Step Monitor Indicator */}
           <div className="flex items-center gap-2">
-            <div className="text-xs font-mono text-slate-400">
-              Analysing record <span className="text-amber-500 font-bold">{activeIndex + 1}</span> of {reviews.length}
+            <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+              Analysing record <span className="text-amber-600 dark:text-amber-500 font-bold">{activeIndex + 1}</span> of {reviews.length}
             </div>
-            <div className="hidden sm:flex h-1.5 w-32 items-center rounded-full bg-white/5 overflow-hidden">
+            <div className="hidden sm:flex h-1.5 w-32 items-center rounded-full bg-slate-200 overflow-hidden dark:bg-white/5">
               <motion.div 
-                className="h-full bg-amber-500"
+                className="h-full bg-slate-900 dark:bg-amber-500"
                 animate={{ width: `${((activeIndex + 1) / reviews.length) * 100}%` }}
                 transition={{ duration: 0.3 }}
               />
@@ -253,13 +257,13 @@ export function Testimonials() {
           <div className="flex gap-3">
             <button
               onClick={() => handleScroll("prev")}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-slate-900 text-slate-400 transition-all hover:border-white/20 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-white/20 dark:hover:text-white"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               onClick={() => handleScroll("next")}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-slate-900 text-slate-400 transition-all hover:border-white/20 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-white/20 dark:hover:text-white"
             >
               <ChevronRight className="h-5 w-5" />
             </button>

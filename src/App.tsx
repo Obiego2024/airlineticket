@@ -81,6 +81,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/flights" element={<Flights promoRegistered={isRegistered} />} />
           <Route path="/flight/:flightId" element={<FlightDetails />} />
+          <Route path="/booking" element={<Booking promoRegistered={isRegistered} />} />
           <Route path="/booking/:flightId" element={<Booking promoRegistered={isRegistered} />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
