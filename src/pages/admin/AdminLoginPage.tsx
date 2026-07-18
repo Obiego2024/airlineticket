@@ -50,46 +50,54 @@ export default function AdminLoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-950">
-              <Mail className="h-4 w-4 text-slate-400" />
+          <div>
+            <label htmlFor="email-input" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Email
+            </label>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-sky-500 dark:border-slate-700 dark:bg-slate-950 context-focus">
+              <Mail className="h-4 w-4 text-slate-400 shrink-0" />
               <input
+                id="email-input"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full bg-transparent text-sm outline-none"
+                className="w-full bg-transparent text-sm text-slate-900 dark:text-white outline-none"
                 placeholder="admin@skylux.com"
+                required
               />
             </div>
-          </label>
+          </div>
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Password</span>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-950">
-              <Lock className="h-4 w-4 text-slate-400" />
+          <div>
+            <label htmlFor="password-input" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Password
+            </label>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-sky-500 dark:border-slate-700 dark:bg-slate-950">
+              <Lock className="h-4 w-4 text-slate-400 shrink-0" />
               <input
+                id="password-input"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full bg-transparent text-sm outline-none"
+                className="w-full bg-transparent text-sm text-slate-900 dark:text-white outline-none"
                 placeholder="Enter password"
+                required
               />
             </div>
-          </label>
+          </div>
 
           {error ? <p className="text-sm text-rose-500">{error}</p> : null}
 
           <button
             type="submit"
-            className="w-full rounded-2xl bg-sky-500 px-4 py-3 font-semibold text-white transition hover:bg-sky-600"
+            className="w-full rounded-2xl bg-sky-500 px-4 py-3 font-semibold text-white transition hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             Sign in
           </button>
         </form>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-          Demo credentials: <span className="font-semibold">admin@skylux.com</span> / <span className="font-semibold">admin1234</span>
+          Demo credentials: <span className="font-semibold text-slate-900 dark:text-white">admin@skylux.com</span> / <span className="font-semibold text-slate-900 dark:text-white">admin1234</span>
         </div>
       </motion.div>
     </div>

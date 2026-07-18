@@ -27,7 +27,6 @@ const navLinks = [
   { to: "/contact", key: "nav.contact" },
 ];
 
-// Expanded language list
 const languageOptions = [
   { code: 'en' as const, label: 'English', short: 'EN' },
   { code: 'es' as const, label: 'Español', short: 'ES' },
@@ -175,13 +174,14 @@ export default function Navbar() {
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {/* Alert Bell */}
+          {/* Alert Bell - Explicitly routes to login first, then redirects conditionally */}
           <Link
-            to="/adminLoginpage"
+            to="/admin"
             className={`p-2 rounded-lg transition-colors duration-300 relative ${themeClasses.iconBtn}`}
+            aria-label="Admin Notifications"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
           </Link>
 
           {/* Account Interactive Dropdown */}
