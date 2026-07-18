@@ -12,13 +12,23 @@ import Register from './pages/Register'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import Dashboard from './pages/Dashboard'
-import AdminDashboard from './pages/AdminDashboard'
 import Services from './pages/Services'
 import { Deals } from './components/home/Deals'
 import { Destinations } from './components/home/Destinations'
 import { useUi } from './context/UiContext'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './components/ui/dialog'
-
+import AdminShell from './components/admin/AdminShell'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import FlightsPage from './pages/admin/FlightsPage'
+import AirlinesPage from './pages/admin/AirlinesPage'
+import BookingsPage from './pages/admin/BookingsPage'
+import CustomersPage from './pages/admin/CustomersPage'
+import PaymentsPage from './pages/admin/PaymentsPage'
+import PromosPage from './pages/admin/PromosPage'
+import ReportsPage from './pages/admin/ReportsPage'
+import SettingsPage from './pages/admin/SettingsPage'
+import ProfilePage from './pages/admin/ProfilePage'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
 
 function NotFound() {
   const { t } = useUi()
@@ -53,6 +63,7 @@ export default function App() {
 
   // Pages that don't need navbar/footer
   const isAuthPage = ['/login', '/register'].includes(location.pathname)
+  const isAdminRoute = location.pathname.startsWith('/admin')
   const isHome = location.pathname === '/'
 
   useEffect(() => {
@@ -74,7 +85,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      {!isAuthPage && <Navbar />}
+      {!isAuthPage && !isAdminRoute && <Navbar />}
       
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
@@ -91,12 +102,25 @@ export default function App() {
           <Route path="/deals" element={<Deals />} />
           <Route path="/destinations" element={<Destinations />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/adminLoginpage" element={<AdminLoginPage />} />
+          <Route path="/admin" element={<AdminShell />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="flights" element={<FlightsPage />} />
+            <Route path="airlines" element={<AirlinesPage />} />
+            <Route path="bookings" element={<BookingsPage />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="payments" element={<PaymentsPage />} />
+            <Route path="promos" element={<PromosPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>
 
-      {!isAuthPage && !isHome && <Footer />}
+      {!isAuthPage && !isHome && !isAdminRoute && <Footer />}
 
       <Dialog open={showPromo} onOpenChange={setShowPromo}>
         <DialogContent>

@@ -177,7 +177,7 @@ export default function Navbar() {
 
           {/* Alert Bell */}
           <Link
-            to="/admin"
+            to="/adminLoginpage"
             className={`p-2 rounded-lg transition-colors duration-300 relative ${themeClasses.iconBtn}`}
           >
             <Bell className="w-4 h-4" />
