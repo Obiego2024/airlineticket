@@ -5,7 +5,7 @@ import { customers as seedCustomers, type AdminCustomer } from '@/lib/adminData'
 
 export default function CustomersPage() {
   const [search, setSearch] = useState('')
-  const [registeredCustomers, setRegisteredCustomers] = useState<AdminCustomer[]>(() => {
+  const [registeredCustomers, ] = useState<AdminCustomer[]>(() => {
     if (typeof window === 'undefined') return seedCustomers
 
     const stored = window.localStorage.getItem('adminRegisteredCustomers')
