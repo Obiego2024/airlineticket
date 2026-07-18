@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   BarChart3,
@@ -42,17 +42,13 @@ const menuItems = [
 export default function AdminShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
-  const { theme, toggleTheme, t } = useUi()
-  const darkMode = theme === 'dark'
+  const { t } = useUi()
 
   useEffect(() => {
-    const isAuthenticated = window.localStorage.getItem('adminAuth') === 'true'
-    if (!isAuthenticated) {
-      navigate('/admin/login', { replace: true })
-    }
-  }, [navigate])
+    document.documentElement.classList.toggle('dark', darkMode)
+  }, [darkMode])
 
   // Close mobile sidebar on navigation
   useEffect(() => {
@@ -126,14 +122,7 @@ export default function AdminShell() {
             </nav>
 
             <div className="border-t border-slate-200 p-4 dark:border-slate-800">
-              <button
-                onClick={() => {
-                  window.localStorage.removeItem('adminAuth')
-                  window.localStorage.removeItem('adminAuthEmail')
-                  navigate('/admin/login', { replace: true })
-                }}
-                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900"
-              >
+              <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900">
                 <LogOut className="h-4 w-4" />
                 {!collapsed && <span>Logout</span>}
               </button>
@@ -192,7 +181,7 @@ export default function AdminShell() {
                   <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950" />
                 </button>
                 <button
-                  onClick={toggleTheme}
+                  onClick={() => setDarkMode((value) => !value)}
                   className="rounded-2xl border border-slate-200 p-2.5 text-slate-600 dark:border-slate-800 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900"
                 >
                   {darkMode ? <SunMedium className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

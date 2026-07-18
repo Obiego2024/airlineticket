@@ -9,9 +9,7 @@ import {
   Sun,
   Globe,
   ChevronDown,
-  Bell,
   User,
-  LayoutDashboard,
   ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +23,7 @@ const navLinks = [
   { to: "/services", key: "nav.services" },
   { to: "/about", key: "nav.about" },
   { to: "/contact", key: "nav.contact" },
+  { to: "/admin", key: "check" },
 ];
 
 const languageOptions = [
@@ -175,14 +174,14 @@ export default function Navbar() {
           </button>
 
           {/* Alert Bell - Explicitly routes to login first, then redirects conditionally */}
-          <Link
-            to="/admin"
+          {/* <Link
+            to=""
             className={`p-2 rounded-lg transition-colors duration-300 relative ${themeClasses.iconBtn}`}
             aria-label="Admin Notifications"
           >
             <Bell className="w-4 h-4" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-          </Link>
+          </Link> */}
 
           {/* Account Interactive Dropdown */}
           <div className="relative flex items-center gap-2">
@@ -225,9 +224,6 @@ export default function Navbar() {
                     <Plane className="w-4 h-4" /> {t('nav.signUp')}
                   </Link>
                   <hr className="border-border" />
-                  <Link to="/dashboard" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground dark:text-white/95 hover:bg-foreground/5 transition-colors">
-                    <LayoutDashboard className="w-4 h-4" /> {t('nav.dashboard')}
-                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>

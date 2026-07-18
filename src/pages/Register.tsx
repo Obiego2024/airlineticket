@@ -10,8 +10,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Github,
-  Chrome,
   Check,
 } from 'lucide-react'
 
@@ -47,17 +45,6 @@ export default function Register() {
 
         {/* Form Card */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-premium p-6 sm:p-8">
-          {/* Social Register */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-              <Chrome className="w-4 h-4" />
-              Google
-            </button>
-            <button className="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-              <Github className="w-4 h-4" />
-              GitHub
-            </button>
-          </div>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">

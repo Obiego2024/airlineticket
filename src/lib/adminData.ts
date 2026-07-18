@@ -226,10 +226,10 @@ export const dashboardMetrics = [
   { label: 'Active Airlines', value: '19', change: '+2', detail: 'Premium network' },
   { label: 'Total Customers', value: '24.4K', change: '+12%', detail: 'Loyalty members' },
   { label: 'Today\'s Bookings', value: '312', change: '+5.1%', detail: 'Peak departures' },
-  { label: 'Revenue', value: '$4.2M', change: '+13.2%', detail: 'Rolling 30 days' },
+  // { label: 'Revenue', value: '$4.2M', change: '+13.2%', detail: 'Rolling 30 days' },
   { label: 'Pending Payments', value: '48', change: '-3', detail: 'Awaiting settlement' },
-  { label: 'Cancelled Flights', value: '7', change: '-1', detail: 'This week' },
-  { label: 'Available Seats', value: '8,920', change: '+4.8%', detail: 'Inventory ready' },
+  // { label: 'Cancelled Flights', value: '7', change: '-1', detail: 'This week' },
+  // { label: 'Available Seats', value: '8,920', change: '+4.8%', detail: 'Inventory ready' },
 ]
 
 export const revenueSeries = [
